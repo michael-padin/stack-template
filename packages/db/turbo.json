@@ -1,0 +1,14 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "generate": {
+      "inputs": ["prisma/schema.prisma"],
+      "outputs": ["generated/**"],
+      "env": ["DATABASE_URL"]
+    },
+    "typecheck": {
+      "dependsOn": ["generate"]
+    }
+  }
+}

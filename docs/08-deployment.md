@@ -1,0 +1,210 @@
+# Deployment
+
+Two Next.js apps + a Postgres database. This document covers hosting,
+environment promotion, and the build pipeline.
+
+## Hosting topology
+
+```
+                    ┌──────────────────┐
+                    │   DNS / CDN      │  (Cloudflare, Vercel, etc.)
+                    └────────┬─────────┘
+                             │
+                ┌────────────┴────────────┐
+                ▼                         ▼
+       ┌────────────────┐         ┌────────────────┐
+       │ apps/web       │         │ apps/admin     │
+       │ app.X.com      │         │ admin.X.com    │
+       └────────┬───────┘         └────────┬───────┘
+                │                          │
+                └────────────┬─────────────┘
+                             ▼
+                    ┌────────────────┐
+                    │   Postgres     │
+                    │  (Neon /       │
+                    │   Supabase /   │
+                    │   RDS / …)     │
+                    └────────────────┘
+```
+
+Both apps deploy independently. They share the database and the same
+`BETTER_AUTH_SECRET`.
+
+## Recommended platforms
+
+| Component          | Recommendation                                      | Why                                           |
+| ------------------ | --------------------------------------------------- | --------------------------------------------- |
+| **apps/web**       | Vercel                                              | First-class Next.js 16 support, edge caching  |
+| **apps/admin**     | Vercel                                              | Same                                          |
+| **Database**       | Any managed Postgres (Neon, Supabase, RDS, Railway) | `@prisma/adapter-pg` speaks standard Postgres |
+| **DNS**            | Cloudflare (or your registrar)                      | Per-subdomain rules                           |
+| **Object storage** | Cloudflare R2 / any S3 (optional)                   | Only if `@repo/storage` is in use             |
+| **Error tracking** | Sentry (optional)                                   | No-op without a DSN                           |
+
+> The base template is non-spatial. If your project pulls in the `feat/geo`
+> branch, the database must have **PostGIS** available as an extension.
+
+## Environment per stage
+
+| Stage      | apps/web URL          | apps/admin URL        | DB                        |
+| ---------- | --------------------- | --------------------- | ------------------------- |
+| Local      | http://localhost:3000 | http://localhost:3001 | Local Docker / dev DB     |
+| Preview    | <branch>.app.X.com    | <branch>.admin.X.com  | Ephemeral branch / dev DB |
+| Production | app.X.com             | admin.X.com           | Production DB             |
+
+### Required env vars per app
+
+**apps/admin**
+
+| Variable                             | Notes                                                  |
+| ------------------------------------ | ------------------------------------------------------ |
+| `DATABASE_URL`                       | Required                                               |
+| `BETTER_AUTH_SECRET`                 | Required — **must match apps/web in the same env**     |
+| `BETTER_AUTH_URL`                    | Admin's canonical URL                                  |
+| `GOOGLE_CLIENT_ID` / `_SECRET`       | Optional (both → enables Google sign-in)               |
+| `NEXT_PUBLIC_APP_NAME`               | Display name                                           |
+| `REVALIDATE_SECRET`                  | Optional — must match apps/web to invalidate its cache |
+| `NEXT_PUBLIC_WEB_URL`                | Optional — target for cache revalidation               |
+| `NEXT_PUBLIC_SENTRY_DSN`             | Optional                                               |
+| `R2_*` / `NEXT_PUBLIC_R2_PUBLIC_URL` | Optional — only if `@repo/storage` is used             |
+
+**apps/web**
+
+| Variable                    | Notes                                               |
+| --------------------------- | --------------------------------------------------- |
+| `DATABASE_URL`              | Optional — unset falls back to `@repo/db/seed-data` |
+| `NEXT_PUBLIC_APP_NAME`      | Display name                                        |
+| `NEXT_PUBLIC_SITE_URL`      | Canonical public URL (OpenGraph, sitemap)           |
+| `NEXT_PUBLIC_ADMIN_URL`     | Optional — shows the "Manage" link                  |
+| `REVALIDATE_SECRET`         | Optional — must match apps/admin                    |
+| `NEXT_PUBLIC_SENTRY_DSN`    | Optional                                            |
+| `NEXT_PUBLIC_R2_PUBLIC_URL` | Optional — only if serving stored images            |
+
+> **Critical:** `BETTER_AUTH_SECRET` must match between `apps/web` and
+> `apps/admin` of the same environment, or sessions won't validate cross-app.
+
+The full reference is the root [`.env.example`](../.env.example). All vars are
+read through `@repo/env/*` and validated at boot.
+
+## Cookie domain (cross-app SSO)
+
+To let users sign in on either app once, set the cookie domain in production:
+
+```ts
+// packages/auth/src/server.ts
+advanced: {
+  crossSubDomainCookies: {
+    enabled: process.env.NODE_ENV === "production",
+    domain: ".example.com",
+  },
+},
+```
+
+## Build pipeline
+
+### Vercel
+
+Each app is a separate Vercel project:
+
+```
+Root directory:        apps/web    (or apps/admin)
+Framework preset:      Next.js
+Install command:       pnpm install --frozen-lockfile
+Build command:         cd ../.. && pnpm turbo run build --filter=@repo/web
+Output directory:      apps/web/.next
+```
+
+Use `--filter` so Turborepo only builds the changed app and its dependent
+packages.
+
+> Set `SKIP_ENV_VALIDATION=1` in the build environment so the Zod env schemas
+> don't fail the build when runtime secrets aren't injected at build time.
+
+#### Remote caching
+
+```bash
+npx turbo login
+npx turbo link
+```
+
+Or set `TURBO_TOKEN` and `TURBO_TEAM` as env vars. Subsequent builds re-use
+cached package outputs across CI runs.
+
+### Self-hosted
+
+```bash
+pnpm install --frozen-lockfile
+pnpm turbo run build --filter=@repo/web
+cd apps/web && pnpm start
+```
+
+## Database migrations in CI
+
+Run a deploy step **before** the apps deploy:
+
+```bash
+DATABASE_URL=$PROD_DATABASE_URL pnpm db:migrate     # prisma migrate deploy
+```
+
+This applies pending migrations from `packages/db/prisma/migrations/`. The seed
+(`pnpm db:seed`) is idempotent, so it's safe to re-run, though you typically only
+run it on initial bootstrap.
+
+### Branching strategy (if your provider supports DB branches)
+
+1. Each PR gets a database branch.
+2. The preview deploy points at that branch's `DATABASE_URL`.
+3. Migrations apply on the branch.
+4. On merge, migrations apply to the main database.
+
+Breaking schema changes never touch production until merge.
+
+## CI
+
+`.github/workflows/ci.yml` runs on push to the default branch and on PRs:
+install (frozen lockfile) → `pnpm lint` → `pnpm typecheck` → `pnpm test`. It sets
+a placeholder `DATABASE_URL` so env validation passes.
+
+## OAuth setup (Google)
+
+In Google Cloud Console:
+
+1. Create an OAuth 2.0 Client ID.
+2. Authorized JavaScript origins: your app + admin URLs (and the localhost
+   equivalents for dev).
+3. Authorized redirect URIs:
+   - `https://admin.example.com/api/auth/callback/google`
+   - `http://localhost:3001/api/auth/callback/google` (dev)
+
+Set the resulting client ID and secret in the admin app's env (and the web app's
+too if you enable Google there).
+
+## Observability
+
+- **Sentry** — set `NEXT_PUBLIC_SENTRY_DSN` to enable; unset = no-op. The
+  instrumentation files (`instrumentation.ts`, `instrumentation-client.ts`)
+  already wire `register()` / `onRequestError` / `onRouterTransitionStart`.
+- **Logging** — `@repo/logger` (pino) emits structured JSON to stdout; the
+  platform's log collector parses it. Tune verbosity with `LOG_LEVEL`.
+
+## Rollback
+
+1. **Vercel** — instant rollback via the dashboard.
+2. **A bad migration** — Prisma migrations are forward-only; write a new
+   reversing migration. Author it as a new directory under `prisma/migrations/`.
+3. **Auth secret rotation** — bump `BETTER_AUTH_SECRET`; all sessions invalidate
+   on next request as cookie signatures stop matching.
+
+## Pre-launch checklist
+
+- [ ] Migrations applied against the production DB (`pnpm db:migrate`)
+- [ ] First admin user created (sign up, or promote via SQL)
+- [ ] `BETTER_AUTH_SECRET` matches between web and admin in prod
+- [ ] `NEXT_PUBLIC_APP_NAME` set to your product name
+- [ ] Google OAuth redirect URIs include production URLs (if used)
+- [ ] `REVALIDATE_SECRET` matches across apps (if cross-app revalidation is used)
+- [ ] Cookie domain set to the parent domain if cross-app SSO is desired
+- [ ] `SKIP_ENV_VALIDATION=1` set in the build environment
+- [ ] `noindex` on the admin app; `robots.txt` / `sitemap` on the public app
+- [ ] Sentry DSN set (if using error tracking)
+- [ ] Backup retention confirmed at the DB provider

@@ -1,0 +1,8 @@
+{
+  "extends": "@repo/tsconfig/base.json",
+  "include": ["src/**/*.ts"],
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["dom", "ES2022"]
+  }
+}

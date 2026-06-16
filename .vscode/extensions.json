@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "oxc.oxc-vscode",
+    "Prisma.prisma",
+    "bradlc.vscode-tailwindcss",
+    "EditorConfig.EditorConfig"
+  ]
+}

@@ -1,0 +1,127 @@
+// Base template schema — plain Postgres (no PostGIS). The `feat/geo` branch
+// re-introduces the `postgis` extension + Unsupported() geometry columns and
+// the ST_* raw-query conventions for spatial projects.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Better Auth core tables ───────────────────────────────────────────────
+// ids are `text` (Better Auth generates its own). Keep these verbatim in any
+// project — they are the contract Better Auth's Prisma adapter expects.
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false) @map("email_verified")
+  image         String?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime  @default(now()) @map("updated_at") @db.Timestamp(6)
+  // Admin plugin fields
+  role          AppRole   @default(admin)
+  banned        Boolean   @default(false)
+  banReason     String?   @map("ban_reason")
+  banExpires    DateTime? @map("ban_expires") @db.Timestamp(6)
+
+  sessions   Session[]
+  accounts   Account[]
+  ownedItems Item[]    @relation("items_owner")
+
+  @@map("user")
+}
+
+model Session {
+  id             String   @id
+  expiresAt      DateTime @map("expires_at") @db.Timestamp(6)
+  token          String   @unique
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamp(6)
+  ipAddress      String?  @map("ip_address")
+  userAgent      String?  @map("user_agent")
+  userId         String   @map("user_id")
+  // Admin plugin: impersonation tracking
+  impersonatedBy String?  @map("impersonated_by")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_session_user")
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String    @map("account_id")
+  providerId            String    @map("provider_id")
+  userId                String    @map("user_id")
+  accessToken           String?   @map("access_token")
+  refreshToken          String?   @map("refresh_token")
+  idToken               String?   @map("id_token")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at") @db.Timestamp(6)
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at") @db.Timestamp(6)
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt             DateTime  @default(now()) @map("updated_at") @db.Timestamp(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_account_user")
+  @@index([providerId, accountId], map: "idx_account_provider")
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime @map("expires_at") @db.Timestamp(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt  DateTime @default(now()) @map("updated_at") @db.Timestamp(6)
+
+  @@index([identifier], map: "idx_verification_identifier")
+  @@index([expiresAt], map: "idx_verification_expires")
+  @@map("verification")
+}
+
+// ── Example domain model ──────────────────────────────────────────────────
+// `Item` is a deliberately generic resource that demonstrates the full CRUD
+// pattern this template ships: a status enum, an owner relation, soft-delete
+// (`deletedAt`), and timestamp tracking. Replace it with your real model(s).
+
+model Item {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String     @db.VarChar(200)
+  description String?    @db.VarChar(2000)
+  status      ItemStatus @default(draft)
+  ownerId     String?    @map("owner_id")
+  deletedAt   DateTime?  @map("deleted_at") @db.Timestamp(6)
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  owner User? @relation("items_owner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  @@index([status], map: "idx_items_status")
+  @@index([ownerId], map: "idx_items_owner")
+  @@index([deletedAt], map: "idx_items_deleted")
+  @@map("items")
+}
+
+enum ItemStatus {
+  draft
+  active
+  archived
+
+  @@map("item_status")
+}
+
+enum AppRole {
+  admin
+
+  @@map("app_role")
+}

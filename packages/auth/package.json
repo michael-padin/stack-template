@@ -1,0 +1,36 @@
+{
+  "name": "@repo/auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts",
+    "./client": "./src/client.ts",
+    "./next": "./src/next.ts"
+  },
+  "scripts": {
+    "gen:schema": "npx @better-auth/cli@latest generate --config ./src/server.ts --output ../db/prisma/schema.prisma",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@repo/db": "workspace:*",
+    "@repo/env": "workspace:*",
+    "@repo/types": "workspace:*",
+    "better-auth": "catalog:"
+  },
+  "devDependencies": {
+    "@repo/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "next": "catalog:",
+    "react": "catalog:",
+    "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "next": "^16.0.0",
+    "react": "^19.0.0"
+  }
+}

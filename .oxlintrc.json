@@ -1,0 +1,63 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["import", "typescript", "react", "jsx-a11y", "nextjs"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "warn",
+    "style": "off"
+  },
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2024": true
+  },
+  "rules": {
+    "no-console": ["error", { "allow": ["warn", "error"] }],
+    "no-unused-vars": "off",
+    "no-shadow": "off",
+    "no-underscore-dangle": "off",
+    "no-await-in-loop": "off",
+    "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "import/no-unassigned-import": "off",
+    "react/react-in-jsx-scope": "off",
+    "react/jsx-no-constructed-context-values": "warn",
+    "react/no-array-index-key": "warn",
+    "react-perf/jsx-no-new-function-as-prop": "warn",
+    "react-perf/jsx-no-new-object-as-prop": "warn",
+    "react-perf/jsx-no-new-array-as-prop": "warn",
+    "react-perf/jsx-no-jsx-as-prop": "warn"
+  },
+  "overrides": [
+    {
+      "files": ["apps/*/components/ui/**/*.{ts,tsx}"],
+      "rules": {
+        "jsx-a11y/anchor-has-content": "off",
+        "jsx-a11y/click-events-have-key-events": "off",
+        "jsx-a11y/no-static-element-interactions": "off",
+        "jsx-a11y/prefer-tag-over-role": "off"
+      }
+    },
+    {
+      "files": ["packages/db/src/seed/**/*.ts"],
+      "rules": {
+        "no-console": "off"
+      }
+    },
+    {
+      "files": ["scripts/**/*.ts"],
+      "rules": {
+        "no-console": "off"
+      }
+    }
+  ],
+  "ignorePatterns": [
+    "**/packages/ui/**",
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.turbo/**",
+    "**/prisma/migrations/**"
+  ]
+}
