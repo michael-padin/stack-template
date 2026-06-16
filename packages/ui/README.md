@@ -24,9 +24,8 @@ import { Form } from "@repo/ui/components/form"; // react-hook-form bindings
 `src/styles/tokens.css` — color, font, radius CSS variables (light + dark).
 
 `src/styles/globals.css` — imports tokens, maps them via Tailwind 4's
-`@theme inline`, and ships base styles: typography, the semantic status
-tokens (`success` / `warning` / `muted`) used by status pills and dots, and
-the `bg-survey-grid` decorative grid-background helper.
+`@theme inline`, and ships base styles: typography, and the semantic status
+tokens (`success` / `warning` / `muted`) used by status pills and dots.
 
 ## How to consume
 

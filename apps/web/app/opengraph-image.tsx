@@ -14,7 +14,7 @@ const COLOR_BG = "#ffffff";
 const COLOR_FOREGROUND = "#252525";
 const COLOR_MUTED = "#737373";
 const COLOR_BORDER = "#e5e5e5";
-const COLOR_PRIMARY = "#6366f1";
+const COLOR_PRIMARY = "#171717";
 
 export default function OpenGraphImage() {
   return new ImageResponse(

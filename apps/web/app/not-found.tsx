@@ -6,7 +6,6 @@ import { buttonVariants } from "@repo/ui/components/button";
 export default function NotFound() {
   return (
     <main className="bg-background relative flex min-h-svh items-center justify-center overflow-hidden px-6">
-      <div className="bg-survey-grid pointer-events-none absolute inset-0 opacity-30" aria-hidden />
       <div className="relative max-w-lg space-y-5">
         <p className="text-muted-foreground text-[0.68rem] tracking-[0.22em] uppercase">
           404 · not found

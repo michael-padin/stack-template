@@ -7,7 +7,7 @@ import { ImageResponse } from "next/og";
 export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
 
-const COLOR = "#6366f1";
+const COLOR = "#171717";
 
 export default function Icon() {
   return new ImageResponse(

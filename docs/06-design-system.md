@@ -1,6 +1,6 @@
 # Design system
 
-The visual baseline is a clean, neutral shadcn theme on an **amber** accent —
+The visual baseline is the clean, neutral **shadcn "neutral" theme** —
 deliberately understated so you can re-skin it for your product by editing
 tokens, not components.
 
@@ -33,7 +33,7 @@ file. Each app imports them through `@repo/ui/styles.css`.
 | `--card` / `--card-foreground`       | Elevated surfaces   |
 | `--popover` / `--popover-foreground` | Floating UI         |
 
-### Primary (amber)
+### Primary (neutral)
 
 | Token                  | Use                                      |
 | ---------------------- | ---------------------------------------- |
@@ -76,7 +76,8 @@ components and you're done — nothing else hardcodes a status color.
 ### Sidebar & charts
 
 A separate `--sidebar-*` scale for the admin navigation, and `--chart-1`
-through `--chart-5` (amber-toned, chosen to stay distinguishable).
+through `--chart-5` (the stock shadcn multi-hue palette, chosen to stay
+distinguishable).
 
 ## Typography
 
@@ -102,9 +103,9 @@ tracking:
 
 ### Tabular numerals
 
-`.coord`, `.font-mono`, `code`, `kbd`, `samp`, and `pre` get tabular figures and
-slashed zeros (`font-variant-numeric: tabular-nums slashed-zero`) so numbers and
-IDs line up in columns.
+`.font-mono`, `code`, `kbd`, `samp`, and `pre` get tabular figures and slashed
+zeros (`font-variant-numeric: tabular-nums slashed-zero`) so numbers and IDs
+line up in columns.
 
 ## Layout primitives
 
@@ -117,15 +118,6 @@ IDs line up in columns.
 ```
 
 A small colored circle for lists, meta rows, and pills (used by `StatusPill`).
-
-### Grid background
-
-```html
-<div class="bg-survey-grid">...</div>
-```
-
-A subtle 24×24px hairline grid. Use sparingly — usually as a hero / sign-in
-backdrop.
 
 ## Components
 
