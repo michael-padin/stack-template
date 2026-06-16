@@ -230,7 +230,7 @@ test:     test changes only
 ```
 
 Branch names: `feat/short-description`, `fix/issue-summary`. Squash on merge to
-keep the main branch linear. commitlint enforces the format on `commit-msg`.
+keep the master branch linear. commitlint enforces the format on `commit-msg`.
 
 ## Helpful pnpm tricks
 
