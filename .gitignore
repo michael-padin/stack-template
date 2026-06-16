@@ -48,6 +48,12 @@ pnpm-debug.log*
 .mcp.json
 *.pen
 *.claude
+# Track committed agent skills under .claude/skills/ (carried by the template);
+# other .claude/ contents (e.g. settings.local.json) stay local.
+!.claude/
+.claude/*
+!.claude/skills/
+!.claude/agents/
 *.devcontainer
 .impeccable.md
 
