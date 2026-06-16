@@ -31,7 +31,8 @@ model User {
 
   sessions   Session[]
   accounts   Account[]
-  ownedItems Item[]    @relation("items_owner")
+  ownedItems Item[]     @relation("items_owner")
+  auditLogs  AuditLog[] @relation("audit_actor")
 
   @@map("user")
 }
@@ -120,8 +121,43 @@ enum ItemStatus {
   @@map("item_status")
 }
 
+// Multi-role RBAC. `admin` has full access; `editor` can read + create/update
+// items; `viewer` is read-only. The capability map lives in @repo/auth
+// (packages/auth/src/permissions.ts) and is mirrored as a Zod enum in
+// @repo/types (`appRoleSchema`). `defaultRole` stays `admin` in this template
+// for zero-friction bootstrapping — real projects should lower it to `viewer`.
 enum AppRole {
   admin
+  editor
+  viewer
 
   @@map("app_role")
+}
+
+// ── Audit log ─────────────────────────────────────────────────────────────
+// Append-only record of who did what. `actorId` is an optional relation to the
+// acting user (SetNull so logs survive user deletion); `actorEmail` is a
+// denormalized snapshot that outlives the relation. `before`/`after`/`metadata`
+// are free-form JSON for diffs and context. Never soft-deleted — these rows are
+// the historical record.
+model AuditLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId    String?  @map("actor_id")
+  actorEmail String?  @map("actor_email")
+  action     String   @db.VarChar(100)
+  entity     String   @db.VarChar(100)
+  entityId   String?  @map("entity_id")
+  summary    String?  @db.VarChar(500)
+  metadata   Json?    @db.JsonB
+  before     Json?    @db.JsonB
+  after      Json?    @db.JsonB
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  actor User? @relation("audit_actor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId], map: "idx_audit_entity")
+  @@index([createdAt], map: "idx_audit_created")
+  @@index([actorId], map: "idx_audit_actor")
+  @@map("audit_log")
 }

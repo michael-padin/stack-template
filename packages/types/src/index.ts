@@ -2,7 +2,9 @@ import { z } from "zod";
 
 // ── Enums ─────────────────────────────────────────────────────────────────
 export const itemStatusSchema = z.enum(["draft", "active", "archived"]);
-export const appRoleSchema = z.enum(["admin"]);
+// Multi-role RBAC: `admin` (full), `editor` (read + create/update items),
+// `viewer` (read-only). The capability map lives in @repo/auth.
+export const appRoleSchema = z.enum(["admin", "editor", "viewer"]);
 
 // ── Item (the example resource) ───────────────────────────────────────────
 // Serialized shape returned to the apps. Dates are ISO strings so the payload
@@ -38,12 +40,40 @@ export const pageQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 
+// ── Audit log ───────────────────────────────────────────────────────────────
+// Serialized shape returned to the apps. `metadata`/`before`/`after` are
+// free-form JSON; dates are ISO strings to cross the server/client boundary.
+export const auditLogSchema = z.object({
+  id: z.string(),
+  actorId: z.string().nullable(),
+  actorEmail: z.string().nullable(),
+  action: z.string(),
+  entity: z.string(),
+  entityId: z.string().nullable(),
+  summary: z.string().nullable(),
+  metadata: z.unknown().nullable(),
+  before: z.unknown().nullable(),
+  after: z.unknown().nullable(),
+  ipAddress: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+// Filter state for the audit-log list — parsed from URL search params.
+export const auditLogFilterSchema = z.object({
+  search: z.string().default(""),
+  entity: z.string().default(""),
+  action: z.string().default(""),
+  actorId: z.string().default(""),
+});
+
 export type ItemStatus = z.infer<typeof itemStatusSchema>;
 export type AppRole = z.infer<typeof appRoleSchema>;
 export type Item = z.infer<typeof itemSchema>;
 export type ItemInput = z.infer<typeof itemInputSchema>;
 export type ItemFilters = z.infer<typeof itemFilterSchema>;
 export type PageQuery = z.infer<typeof pageQuerySchema>;
+export type AuditLog = z.infer<typeof auditLogSchema>;
+export type AuditLogFilters = z.infer<typeof auditLogFilterSchema>;
 
 /** Envelope for any paginated list. */
 export interface Paginated<T> {
@@ -65,4 +95,16 @@ export const STATUS_DESCRIPTIONS: Record<ItemStatus, string> = {
   draft: "Not yet published.",
   active: "Live and visible to users.",
   archived: "Retired from active use.",
+};
+
+export const ROLE_LABELS: Record<AppRole, string> = {
+  admin: "Admin",
+  editor: "Editor",
+  viewer: "Viewer",
+};
+
+export const ROLE_DESCRIPTIONS: Record<AppRole, string> = {
+  admin: "Full access — manage items, users, and settings.",
+  editor: "Read, create, and update items.",
+  viewer: "Read-only access.",
 };

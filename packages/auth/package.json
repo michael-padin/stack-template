@@ -9,7 +9,8 @@
     ".": "./src/index.ts",
     "./server": "./src/server.ts",
     "./client": "./src/client.ts",
-    "./next": "./src/next.ts"
+    "./next": "./src/next.ts",
+    "./permissions": "./src/permissions.ts"
   },
   "scripts": {
     "gen:schema": "npx @better-auth/cli@latest generate --config ./src/server.ts --output ../db/prisma/schema.prisma",

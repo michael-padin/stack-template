@@ -26,9 +26,10 @@ Everything lives in `packages/db/prisma/schema.prisma`, grouped with comments:
 
 | Section       | Models                                       | Purpose                                           |
 | ------------- | -------------------------------------------- | ------------------------------------------------- |
-| Enums         | `item_status`, `app_role`                    | Postgres enums                                    |
+| Enums         | `item_status`, `app_role`                    | Postgres enums (`app_role` = `admin`/`editor`/`viewer`) |
 | Better Auth   | `user`, `session`, `account`, `verification` | Better Auth tables — keep verbatim                |
 | Example model | `items` (`Item`)                             | The generic CRUD resource — replace with your own |
+| Audit         | `audit_log` (`AuditLog`)                     | Append-only record of who did what                |
 
 The Prisma client is generated to `packages/db/generated/` (not `node_modules`),
 configured via `generator client { output = "../generated" }`.
@@ -73,6 +74,49 @@ It demonstrates the patterns this template leans on:
   excludes soft-deleted rows (`WHERE deleted_at IS NULL`).
 
 Replace `Item` with your real model(s); the auth tables stay.
+
+### The `AuditLog` model
+
+`AuditLog` (table `audit_log`) is an **append-only** record of who did what —
+the foundation features like item history and a moderation trail build on:
+
+```prisma
+model AuditLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId    String?  @map("actor_id")     // optional relation to User
+  actorEmail String?  @map("actor_email")  // denormalized — survives user deletion
+  action     String   @db.VarChar(100)     // e.g. "item.create"
+  entity     String   @db.VarChar(100)     // e.g. "Item"
+  entityId   String?  @map("entity_id")
+  summary    String?  @db.VarChar(500)
+  metadata   Json?    @db.JsonB
+  before     Json?    @db.JsonB            // pre-change snapshot (for diffs)
+  after      Json?    @db.JsonB            // post-change snapshot
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  actor User? @relation("audit_actor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId], map: "idx_audit_entity")
+  @@index([createdAt],        map: "idx_audit_created")
+  @@index([actorId],          map: "idx_audit_actor")
+  @@map("audit_log")
+}
+```
+
+Design notes:
+
+- **`actorId` is `onDelete: SetNull`** and **`actorEmail` is denormalized** —
+  the log row outlives the user it references, keeping the historical record
+  intact after a `removeUser`.
+- **JSON columns** (`metadata`, `before`, `after`) are free-form. The query
+  layer surfaces them as `unknown` at the serialized boundary — callers narrow
+  before use (never `any`).
+- **No soft-delete.** Audit rows are the historical record; they aren't deleted.
+
+Write with `recordAudit(input)` and read with `listAuditLogs(filters, page)` from
+`@repo/db` (see [Queries](#queries)). `recordAudit` is meant to be called from
+Server Actions after a mutation.
 
 ## The typed-row convention (`$queryRaw<Row[]>`)
 
@@ -129,6 +173,13 @@ needed).
 When you migrate a brand-new database, this file runs first via
 `prisma migrate deploy`.
 
+Subsequent migrations follow in timestamp order. `…_rbac_and_audit` adds the
+`editor`/`viewer` values to `app_role` and creates the `audit_log` table (with
+its indexes and the `actor_id → user.id` foreign key). Note that
+`ALTER TYPE … ADD VALUE` can't run inside the same transaction that uses the new
+value, so enum additions and the rest are separate statements — Prisma's
+`migrate dev` lays this out for you.
+
 ## Seeding
 
 The seed (`packages/db/src/seed/run.ts`) upserts the example rows defined in
@@ -172,9 +223,12 @@ The query layer keeps a single source of truth for the serialized shape:
 - `createItem` / `updateItem` / `softDeleteItem` — mutations used by the admin
   Server Actions.
 - `getAdminSummary()` — dashboard aggregates (per-status counts via `groupBy`).
+- `recordAudit(input)` / `listAuditLogs(filters, page)` — append + paginated
+  read for the `AuditLog` model (newest first). `listAuditLogs` returns the same
+  `Paginated<T>` envelope as `listItemsPaginated`.
 
 Filters and pagination are typed by Zod schemas in `@repo/types`
-(`itemFilterSchema`, `pageQuerySchema`).
+(`itemFilterSchema`, `auditLogFilterSchema`, `pageQuerySchema`).
 
 ## Connection management
 

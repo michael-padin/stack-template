@@ -54,7 +54,12 @@ export const auth = betterAuth({
   experimental: { joins: true }, // fuse session+user reads
 
   plugins: [
-    admin({ defaultRole: "admin", adminRole: "admin", adminRoles: ["admin"] }),
+    admin({
+      defaultRole: "admin",
+      ac: accessControl, // from ./access-control — teaches the plugin our roles
+      roles: accessControlRoles, // { admin, editor, viewer }
+      adminRoles: ["admin"], // only `admin` gets the admin API
+    }),
     nextCookies(), // must be LAST
   ],
 });
@@ -77,12 +82,39 @@ Env values come from `@repo/env/auth` (server) and `@repo/env/client` (the
 | `DATABASE_URL`                              | both                      | Where sessions are stored                                 |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | optional                  | Enables Google sign-in when both are set                  |
 
-## Roles
+## Roles and permissions
 
-There is a single role: `admin`. Everyone signed into the admin app has full
-access. The `admin` plugin is still loaded (so the admin API endpoints —
-`/api/auth/admin/*` — keep working), with `defaultRole` and `adminRoles` both
-`"admin"`. New sign-ups are admins automatically.
+There are three roles: **`admin`**, **`editor`**, and **`viewer`** (the
+`app_role` Postgres enum, mirrored as `appRoleSchema` in `@repo/types`).
+
+| Role     | Capabilities                                                  |
+| -------- | ------------------------------------------------------------ |
+| `admin`  | Full access — items, users, settings, audit log              |
+| `editor` | Read + create/update/delete items                            |
+| `viewer` | Read-only (items)                                            |
+
+`defaultRole` is **still `admin`** so a fresh clone bootstraps with zero setup —
+the first sign-up is an admin. **Real projects should lower this** to `"viewer"`
+(or `"editor"`) in `packages/auth/src/server.ts` and promote the first admin by
+hand (see [Bootstrapping the first admin](#bootstrapping-the-first-admin)).
+
+### The permission model
+
+Two layers, kept in lockstep:
+
+- **App-facing capabilities** — `packages/auth/src/permissions.ts` defines a
+  `Capability` union (`items.read`, `items.update`, `users.manage`, `audit.read`,
+  …) and a `ROLE_CAPABILITIES` map. Route/action guards check a *capability*, not
+  a role name, so adding a role later is a data change here, not a sweep through
+  call sites. Helpers: `hasPermission(user, capability)`, `hasRole(user,
+  ...roles)`, `hasAtLeastRole(user, minimumRole)` (rank-based).
+- **Better Auth access control** — `packages/auth/src/access-control.ts` mirrors
+  the roles into Better Auth's own access-control system (`createAccessControl`),
+  so the admin plugin API and `auth.api.userHasPermission(...)` understand them.
+  Wired into the plugin via `ac` + `roles`.
+
+Presentation labels live in `@repo/types` (`ROLE_LABELS`, `ROLE_DESCRIPTIONS`),
+the single source of truth for role UI copy.
 
 ### Bootstrapping the first admin
 
@@ -102,6 +134,19 @@ no email provider is wired by default).
 `requireAdmin()` from `@repo/auth/next` is the source of truth. It reads the
 session, then redirects to `/sign-in` (no session) or `/forbidden` (not an
 admin, or banned and the ban hasn't expired).
+
+For the non-admin roles, two sibling gates with the same redirect conventions:
+
+- **`requireRole(...roles)`** — admits the session only if its role is one of
+  the listed ones, e.g. `await requireRole("admin", "editor")`.
+- **`requireCapability(capability)`** — resolves the role to its capability set
+  and checks one capability, e.g. `await requireCapability("items.update")`.
+  Prefer this for resource guards so role membership stays an implementation
+  detail.
+
+Both redirect to `/sign-in` when unauthenticated and `/forbidden` when the role
+or capability isn't granted (or the user is banned), exactly like
+`requireAdmin()`.
 
 ### Server Components
 

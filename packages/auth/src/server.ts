@@ -6,6 +6,8 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { admin } from "better-auth/plugins";
 import { nextCookies } from "better-auth/next-js";
 
+import { accessControl, accessControlRoles } from "./access-control";
+
 export const auth = betterAuth({
   appName: APP_NAME,
   baseURL: env.BETTER_AUTH_URL,
@@ -58,9 +60,20 @@ export const auth = betterAuth({
   experimental: { joins: true },
 
   plugins: [
+    // Multi-role RBAC. `roles` lists every assignable role; `adminRoles` is the
+    // subset granted access to the admin plugin's API (`/api/auth/admin/*`).
+    //
+    // `defaultRole` stays `admin` so a fresh clone bootstraps with zero setup —
+    // the first sign-up is an admin. Real projects should lower this to
+    // `"viewer"` (or `"editor"`) and promote the first admin by hand (see
+    // docs/04-authentication.md → "Bootstrapping the first admin").
     admin({
       defaultRole: "admin",
-      adminRole: "admin",
+      // `ac` + `roles` teach the admin plugin our `admin | editor | viewer`
+      // access-control roles (defined in ./access-control). `adminRoles` is the
+      // subset granted access to the admin API (`/api/auth/admin/*`).
+      ac: accessControl,
+      roles: accessControlRoles,
       adminRoles: ["admin"],
     }),
     nextCookies(),

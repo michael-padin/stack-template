@@ -50,8 +50,10 @@ pnpm --filter @repo/db studio
 pnpm turbo run build --filter=@repo/web    # one app + its deps
 ```
 
-Node ≥ 24, pnpm 9.15. There's a single `admin` role. Unit tests run on Vitest
-(`pnpm test`); e2e on Playwright (specs in `e2e/`).
+Node ≥ 24, pnpm 9.15. Roles are `admin | editor | viewer` (capability map in
+`@repo/auth`; `defaultRole` is still `admin` so a fresh clone bootstraps with
+zero setup). Unit tests run on Vitest (`pnpm test`); e2e on Playwright (specs in
+`e2e/`).
 
 ## Architecture essentials
 
@@ -76,16 +78,25 @@ management (`/users`) and profile (`/profile`). Better Auth tables
 (user/session/account/verification) are kept verbatim — they're the contract
 Better Auth's Prisma adapter expects.
 
-**Auth model** — Better Auth 1.4 with the `admin` plugin (`defaultRole:
-"admin"`, single role). DB-backed sessions (instant revoke, no JWT staleness),
-email/password + optional Google OAuth, Prisma adapter.
+**Auth model** — Better Auth 1.4 with the `admin` plugin. Roles are
+`admin | editor | viewer` (`defaultRole: "admin"` so a fresh clone bootstraps
+with zero setup; real projects should lower it). DB-backed sessions (instant
+revoke, no JWT staleness), email/password + optional Google OAuth, Prisma
+adapter.
 
+- **RBAC** — a capability map (`Capability`, `ROLE_CAPABILITIES`) lives in
+  `packages/auth/src/permissions.ts`, mirrored on the Better Auth side by an
+  access-control config in `packages/auth/src/access-control.ts`. Roles are also
+  a Zod enum in `@repo/types` (`appRoleSchema` + `ROLE_LABELS` /
+  `ROLE_DESCRIPTIONS`). Keep enum + permission map + access-control in lockstep.
 - `proxy.ts` (replaces `middleware.ts` post-CVE-2025-29927) is **optimistic,
   cookie-only** in the admin app — never the sole gate. The web app's `proxy.ts`
   does per-IP rate limiting, not auth.
 - `requireAdmin()` from `@repo/auth/next`, called in Server Components / route
   handlers / Server Actions, is the source of truth. It redirects to `/sign-in`
-  (no session) or `/forbidden` (not admin / banned).
+  (no session) or `/forbidden` (not admin / banned). `requireRole(...roles)` and
+  `requireCapability(capability)` are the non-admin gates with the same redirect
+  conventions.
 - Only the admin app mounts `/api/auth/[...all]`.
 
 **Database** — plain Postgres via Prisma 7 + `@prisma/adapter-pg` (node-postgres).
