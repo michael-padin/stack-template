@@ -58,6 +58,7 @@
     "**/dist/**",
     "**/build/**",
     "**/.turbo/**",
-    "**/prisma/migrations/**"
+    "**/prisma/migrations/**",
+    "**/.claude/**"
   ]
 }
