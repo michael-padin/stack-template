@@ -19,6 +19,7 @@
         "DATABASE_URL",
         "SKIP_ENV_VALIDATION",
         "NEXT_PUBLIC_*",
+        "BETA_FEATURES",
         "BETTER_AUTH_SECRET",
         "BETTER_AUTH_URL",
         "GOOGLE_CLIENT_ID",

@@ -13,11 +13,20 @@
     "generate": "pnpm with-env prisma generate",
     "migrate": "pnpm with-env prisma migrate deploy",
     "migrate:dev": "pnpm with-env prisma migrate dev",
+    "migrate:prod": "pnpm with-env:prod prisma migrate deploy",
+    "migrate:staging": "pnpm with-env:staging prisma migrate deploy",
     "push": "pnpm with-env prisma db push",
+    "reset": "pnpm with-env prisma migrate reset",
+    "reset:staging": "pnpm with-env:staging prisma migrate reset",
     "seed": "pnpm with-env tsx src/seed/run.ts",
+    "seed:staging": "SEED_ALLOW_REMOTE=true pnpm with-env:staging tsx src/seed/run.ts",
     "studio": "pnpm with-env prisma studio",
+    "studio:prod": "pnpm with-env:prod prisma studio",
+    "studio:staging": "pnpm with-env:staging prisma studio",
     "typecheck": "tsc --noEmit",
-    "with-env": "dotenv -e .env.local --"
+    "with-env": "dotenv -e ../../.env.local --",
+    "with-env:prod": "dotenv -e ../../.env.production --",
+    "with-env:staging": "dotenv -e ../../.env.staging --"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",

@@ -41,6 +41,15 @@ pnpm db:seed          # idempotent — re-runnable
 pnpm db:studio
 pnpm auth:gen-schema  # regenerate auth schema after plugin changes
 
+# Stage-scoped DB tooling (reads root .env.staging / .env.production):
+pnpm db:migrate:staging
+pnpm db:migrate:prod
+pnpm db:seed:staging     # sets SEED_ALLOW_REMOTE=true — no db:seed:prod (dangerous by design)
+pnpm db:studio:staging
+pnpm db:studio:prod
+pnpm db:reset            # prisma migrate reset (local)
+pnpm db:reset:staging
+
 # Local Postgres via Docker:
 docker compose up -d db
 
@@ -112,12 +121,27 @@ update the relevant schema in `@repo/types` and the query builder in
 `packages/db/src/queries/`.
 
 **Env** — read via the per-concern modules under `@repo/env/*`:
-`@repo/env/db`, `@repo/env/auth`, `@repo/env/client` (the `NEXT_PUBLIC_*` one),
-`@repo/env/storage`, `@repo/env/revalidate`. Never `process.env.X` directly in
-app code (the one sanctioned exception is `@repo/logger`, which reads
-`LOG_LEVEL`/`NODE_ENV` before any env module is loaded). Adding an env var
-requires updating: the `.env.example` files, `turbo.json`'s `build.env` array,
-and the matching Zod schema in `packages/env/src/`.
+`@repo/env/db`, `@repo/env/auth`, `@repo/env/client` (the `NEXT_PUBLIC_*` one,
+including `APP_ENV`/`NEXT_PUBLIC_APP_ENV` — the deployment marker that drives a
+non-production banner; unset = production), `@repo/env/features` (server-only
+feature flags, off by default — `getFeatureFlags()` reads them, and
+`requireFeature(flag)` from `apps/admin/lib/require-feature.ts` gates a route,
+redirecting to `/forbidden` like the other gates), `@repo/env/storage`,
+`@repo/env/revalidate`. Never `process.env.X` directly in app code (the one
+sanctioned exception is `@repo/logger`, which reads `LOG_LEVEL`/`NODE_ENV`
+before any env module is loaded). Adding an env var — including a feature
+flag — requires updating: the `.env.example` files, `turbo.json`'s `build.env`
+array, and the matching Zod schema in `packages/env/src/`.
+
+**Env files are centralized at the repo root.** Root `.env.local` is shared by
+both apps and the Prisma CLI tooling. Each app's `dev` script loads
+`apps/<app>/.env.local` FIRST (per-app overrides win on duplicate keys) then
+root `.env.local` (shared vars fill in the rest) via `dotenv-cli` — a missing
+file is not an error, so a fresh clone with no env files still boots. Per-app
+`.env.example` files are slim: only the overrides that must differ per app
+(e.g. admin's `BETTER_AUTH_URL`). `.env.staging` / `.env.production` at the
+root are gitignored, per-stage files that back the `db:*:staging` / `db:*:prod`
+commands.
 
 **Display name** — read from `@repo/env/client`'s `APP_NAME`
 (`NEXT_PUBLIC_APP_NAME`, default "Internal Tools"). Never hardcode the product

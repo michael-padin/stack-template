@@ -86,6 +86,31 @@ Both apps deploy independently. They share the database and the same
 The full reference is the root [`.env.example`](../.env.example). All vars are
 read through `@repo/env/*` and validated at boot.
 
+### Env file model
+
+Env vars are centralized at the repo root rather than duplicated per app:
+
+- **Root `.env.local`** — shared by `apps/web`, `apps/admin`, and the Prisma
+  CLI tooling. This is where `DATABASE_URL`, `BETTER_AUTH_SECRET`, and every
+  other cross-app value live locally.
+- **`apps/<app>/.env.local`** — optional, per-app overrides only (e.g.
+  admin's `BETTER_AUTH_URL`, since it differs by app). Each app's `dev` script
+  loads its own `apps/<app>/.env.local` FIRST, then root `.env.local` — the
+  per-app file wins on duplicate keys, root fills in the rest.
+- **`.env.staging` / `.env.production`** (root) — per-stage secrets, read by
+  the `db:*:staging` / `db:*:prod` commands (see
+  [Database — stage-scoped commands](./03-database.md#stage-scoped-commands)).
+  Both are gitignored — **never commit them**. Populate them locally when you
+  need to run a stage DB command from your machine, or provide the same
+  variables through your host platform's environment settings for the actual
+  app deploys (Vercel project env vars, etc.) — the platform doesn't read
+  these files.
+
+On a hosted platform (Vercel, etc.), set env vars in the platform's project
+settings per environment (Production / Preview / Development) rather than
+relying on any `.env*` file — those files are for local dev and for driving
+the `db:*:staging` / `db:*:prod` CLI commands from your machine.
+
 ## Cookie domain (cross-app SSO)
 
 To let users sign in on either app once, set the cookie domain in production:
@@ -149,6 +174,20 @@ DATABASE_URL=$PROD_DATABASE_URL pnpm db:migrate     # prisma migrate deploy
 This applies pending migrations from `packages/db/prisma/migrations/`. The seed
 (`pnpm db:seed`) is idempotent, so it's safe to re-run, though you typically only
 run it on initial bootstrap.
+
+Running the same commands from your own machine against staging or production
+(rather than injecting `DATABASE_URL` inline), use the stage-scoped variants,
+which read `.env.staging` / `.env.production` at the root:
+
+```bash
+pnpm db:migrate:staging   # prisma migrate deploy against staging
+pnpm db:migrate:prod      # prisma migrate deploy against production
+pnpm db:seed:staging      # idempotent seed against staging only — no db:seed:prod
+```
+
+See [Database — stage-scoped commands](./03-database.md#stage-scoped-commands)
+for the full list and the `SEED_ALLOW_REMOTE` safety rail that guards the demo
+seed against running on a non-local database by accident.
 
 ### Branching strategy (if your provider supports DB branches)
 

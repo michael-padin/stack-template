@@ -157,10 +157,11 @@ pnpm db:studio           # prisma studio
 pnpm db:push             # prisma db push
 ```
 
-> These scripts run through `pnpm with-env` (dotenv-cli) so
-> `packages/db/.env.local` populates `DATABASE_URL` before Prisma evaluates.
-> Migration paths and the datasource URL are configured in
-> `packages/db/prisma.config.ts`.
+> These scripts run through `pnpm with-env` (dotenv-cli) so the root
+> `.env.local` populates `DATABASE_URL` before Prisma evaluates. Migration
+> paths and the datasource URL are configured in `packages/db/prisma.config.ts`.
+> See [Stage-scoped commands](#stage-scoped-commands) below for staging/
+> production variants that read `.env.staging` / `.env.production` instead.
 
 ### The initial migration
 
@@ -201,6 +202,44 @@ two uses in sync — edit one file, both the seed and the fallback update.
 
 When you swap in your own model, edit `example-data.ts` (both the seed array and
 `fallbackItems()`), then re-run `pnpm db:seed`.
+
+## Stage-scoped commands
+
+The default `db:*` commands (`db:migrate`, `db:seed`, `db:studio`, …) read the
+root `.env.local` via `dotenv-cli` — your local database. For staging and
+production, use the stage-scoped variants instead:
+
+```bash
+pnpm db:migrate:staging   # prisma migrate deploy, reads root .env.staging
+pnpm db:migrate:prod      # prisma migrate deploy, reads root .env.production
+
+pnpm db:seed:staging      # idempotent seed against staging (sets SEED_ALLOW_REMOTE=true)
+
+pnpm db:studio:staging    # prisma studio against staging
+pnpm db:studio:prod       # prisma studio against production
+
+pnpm db:reset             # prisma migrate reset, local
+pnpm db:reset:staging     # prisma migrate reset, staging
+```
+
+Each `:staging` / `:prod` script points `dotenv-cli` at a different root env
+file (`.env.staging` / `.env.production` instead of `.env.local`) — see
+`packages/db/package.json`'s `with-env:staging` / `with-env:prod` scripts.
+Both files are gitignored; create them locally (copied from the root
+`.env.example`) when you need to run a stage command from your machine, or
+supply the same variables through your host platform's environment settings.
+
+**There's no `db:seed:prod` or `db:reset:prod`.** Seeding or resetting
+production is dangerous enough that it's deliberately not a one-liner — the
+demo seed is example data, not something you want live on a production
+database by accident. If you genuinely need it, run `db:seed` with
+`SEED_ALLOW_REMOTE=true` and a production `DATABASE_URL` by hand.
+
+The seed script (`packages/db/src/seed/run.ts`) has a safety rail:
+`isLocalDatabase()` checks that `DATABASE_URL` points at `localhost`, a
+loopback address, or `host.docker.internal`. Seeding anything else throws
+unless `SEED_ALLOW_REMOTE=true` is set — which `db:seed:staging` sets for you.
+This guards against accidentally running example data into a real database.
 
 ## Queries
 

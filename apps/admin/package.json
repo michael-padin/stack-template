@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "next build",
-    "dev": "next dev --port 3001",
+    "dev": "dotenv -e .env.local -e ../../.env.local -- next dev --port 3001",
     "start": "next start --port 3001",
     "typecheck": "tsc --noEmit"
   },
@@ -32,6 +32,7 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "dotenv-cli": "^11.0.0",
     "tailwindcss": "catalog:",
     "typescript": "catalog:"
   }

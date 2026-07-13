@@ -12,6 +12,18 @@
     "node": true,
     "es2024": true
   },
+  "settings": {
+    "jsx-a11y": {
+      "components": {
+        "Input": "input",
+        "InputGroupInput": "input",
+        "NativeSelect": "select",
+        "NativeSelectOption": "option",
+        "Textarea": "textarea",
+        "Label": "label"
+      }
+    }
+  },
   "rules": {
     "no-console": ["error", { "allow": ["warn", "error"] }],
     "no-unused-vars": "off",
@@ -59,6 +71,8 @@
     "**/build/**",
     "**/.turbo/**",
     "**/prisma/migrations/**",
-    "**/.claude/**"
+    "**/.claude/**",
+    "**/generated/**",
+    "**/_legacy/**"
   ]
 }

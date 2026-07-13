@@ -10,6 +10,10 @@ export const env = createEnv({
     // Display name used across both apps (titles, sign-in, auth). The rename
     // script sets this per project; the default keeps the template self-describing.
     NEXT_PUBLIC_APP_NAME: z.string().default("Internal Tools"),
+    // Which deployment this is. Drives a non-production banner (staging shows a
+    // warning bar). Unset → production, so prod needs no extra config; set to
+    // "staging" on the staging/Preview deploy.
+    NEXT_PUBLIC_APP_ENV: z.enum(["production", "staging", "development"]).default("production"),
     NEXT_PUBLIC_ADMIN_URL: z.url().optional(),
     NEXT_PUBLIC_WEB_URL: z.url().optional(),
     NEXT_PUBLIC_SITE_URL: z.url().optional(),
@@ -21,6 +25,7 @@ export const env = createEnv({
   },
   runtimeEnv: {
     NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME,
+    NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
     NEXT_PUBLIC_ADMIN_URL: process.env.NEXT_PUBLIC_ADMIN_URL,
     NEXT_PUBLIC_WEB_URL: process.env.NEXT_PUBLIC_WEB_URL,
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
@@ -35,3 +40,6 @@ export type ClientEnv = typeof env;
 
 /** Convenience constant — the app's display name. */
 export const APP_NAME = env.NEXT_PUBLIC_APP_NAME;
+
+/** Convenience constant — the deployment environment (production by default). */
+export const APP_ENV = env.NEXT_PUBLIC_APP_ENV;

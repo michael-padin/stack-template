@@ -46,53 +46,56 @@ postgresql://postgres:postgres@localhost:5432/app?schema=public
 
 ## 3. Configure environment
 
-Each context loads its own env file. Copy the templates:
+Env vars are centralized at the repo root — one shared `.env.local` for both
+apps and the Prisma CLI tooling, plus optional per-app override files. Copy
+the shared template first:
 
 ```bash
-cp apps/web/.env.example     apps/web/.env.local
-cp apps/admin/.env.example   apps/admin/.env.local
-cp packages/db/.env.example  packages/db/.env.local
+cp .env.example  .env.local
 ```
 
 Then fill in the values. The most important keys:
 
-### `apps/admin/.env.local`
-
 ```dotenv
-# Required — admin reads the DB and stores sessions there.
+# Required for the admin app (and any real DB read/write). Optional for
+# apps/web — unset falls back to the example dataset.
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app?schema=public
 
 # Better Auth secret — generate with: openssl rand -base64 32
 BETTER_AUTH_SECRET=<32+ random bytes>
-BETTER_AUTH_URL=http://localhost:3001
-
-# Optional: Google sign-in (both must be set to enable the button)
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-```
-
-### `apps/web/.env.local`
-
-```dotenv
-# Optional here — unset = falls back to the example dataset.
-# DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app?schema=public
 
 NEXT_PUBLIC_APP_NAME=Internal Tools
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
-### `packages/db/.env.local`
+Each app's `dev` script loads its own `apps/<app>/.env.local` FIRST (if
+present), then the root `.env.local` — so per-app values override the shared
+ones, and the shared file fills in everything else. `apps/web/.env.local` is
+optional; `apps/admin/.env.local` needs exactly one override, its own
+`BETTER_AUTH_URL`:
+
+```bash
+cp apps/admin/.env.example  apps/admin/.env.local
+```
 
 ```dotenv
-# Used by the Prisma CLI (generate / migrate / seed) via dotenv-cli.
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app?schema=public
+# apps/admin/.env.local — differs from apps/web, so it can't live in the
+# shared root file.
+BETTER_AUTH_URL=http://localhost:3001
 ```
+
+The Prisma CLI (`pnpm db:generate` / `db:migrate` / `db:seed` / `db:studio`)
+also reads the root `.env.local` via `dotenv-cli` — no separate file needed
+for local dev. (Staging/production DB commands read `.env.staging` /
+`.env.production` at the root instead — see
+[Database — stage-scoped commands](./03-database.md#stage-scoped-commands).)
 
 > Env values are read through `@repo/env/*` (`@t3-oss/env-core` +
 > `@t3-oss/env-nextjs`) and validated against a Zod schema at boot. The modules
 > are per-concern: `@repo/env/db`, `@repo/env/auth`, `@repo/env/client` (the
-> `NEXT_PUBLIC_*` one), `@repo/env/storage`, `@repo/env/revalidate`. Don't read
-> `process.env.*` directly.
+> `NEXT_PUBLIC_*` one), `@repo/env/features` (server-only feature flags),
+> `@repo/env/storage`, `@repo/env/revalidate`. Don't read `process.env.*`
+> directly.
 
 The full variable reference is the root [`.env.example`](../.env.example).
 
@@ -164,8 +167,10 @@ point `DATABASE_URL` at a database that is running.
 
 ### The public app shows example data even though I set `DATABASE_URL`
 
-`DATABASE_URL` belongs in `apps/web/.env.local` for the web app to read it.
-Restart the dev server after editing env files — Next.js loads them at boot.
+`DATABASE_URL` belongs in the root `.env.local` (or `apps/web/.env.local` if
+you're overriding it per app). Restart the dev server after editing env
+files — the `dotenv -e` wrapper in each app's `dev` script only reads them
+at process start.
 
 ## Next steps
 
