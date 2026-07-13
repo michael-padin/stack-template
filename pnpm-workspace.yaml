@@ -18,7 +18,7 @@ catalog:
 
   # core tooling
   typescript: ^5.7.0
-  zod: ^4.3.6
+  zod: ^4.4.3
 
   # UI
   "@tailwindcss/postcss": ^4
